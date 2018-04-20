@@ -2,13 +2,15 @@
   (:require
     [taoensso.nippy :as nippy])
   (:import
-    [java.io File FileOutputStream FileInputStream DataInputStream DataOutputStream EOFException Closeable]
+    [java.io File FileOutputStream FileInputStream DataInputStream DataOutputStream EOFException Closeable IOException]
     [clojure.lang IDeref ExceptionInfo]
-    (javax.crypto Cipher CipherOutputStream CipherInputStream)))
+    (javax.crypto Cipher CipherOutputStream CipherInputStream BadPaddingException)))
 
 (def bad-journal (str "Unable to open backup. Either it was encrypted and you "
                       "attempted to open it without proper ciphers or "
                       "we were interrupted during write"))
+
+(def bad-cipher "Incorrect cipher provided for journal")
 
 (defprotocol Prevayler
   (handle! [_ event]
@@ -38,6 +40,10 @@
   (try
     (try-to-restore! handler state-atom data-in)
     (catch EOFException _done)
+    (catch IOException e
+      (if (= BadPaddingException (-> e (.getCause) (.getClass)))
+        (throw (ex-info bad-cipher {} e))
+        (throw e)))
     (catch ExceptionInfo e
       (throw (ex-info bad-journal {} e)))))
 
