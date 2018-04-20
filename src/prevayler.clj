@@ -3,7 +3,12 @@
     [taoensso.nippy :as nippy])
   (:import
     [java.io File FileOutputStream FileInputStream DataInputStream DataOutputStream EOFException Closeable]
-    [clojure.lang IDeref]))
+    [clojure.lang IDeref ExceptionInfo]
+    (javax.crypto Cipher CipherOutputStream CipherInputStream)))
+
+(def bad-journal (str "Unable to open backup. Either it was encrypted and you "
+                      "attempted to open it without proper ciphers or "
+                      "we were interrupted during write"))
 
 (defprotocol Prevayler
   (handle! [_ event]
@@ -25,18 +30,16 @@
 (defn- try-to-restore! [handler state-atom data-in]
   (let [read-value! #(nippy/thaw-from-in! data-in)]
     (reset! state-atom (read-value!))
-    (while true           ;Ends with EOFException
+    (while true                                             ;Ends with EOFException
       (let [[new-state _result] (handler @state-atom (read-value!))]
         (reset! state-atom new-state)))))
 
-(defn- restore! [handler state-atom ^File file]
-  (with-open [data-in (-> file FileInputStream. DataInputStream.)]
-    (try
-      (try-to-restore! handler state-atom data-in)
-
-      (catch EOFException _done)
-      (catch Exception corruption
-        (println "Warning - Corruption at end of prevalence file (this is normally OK and can happen when the process is killed during write):" corruption)))))
+(defn- restore! [handler state-atom data-in]
+  (try
+    (try-to-restore! handler state-atom data-in)
+    (catch EOFException _done)
+    (catch ExceptionInfo e
+      (throw (ex-info bad-journal {} e)))))
 
 (defn- produce-backup! [file]
   (let [backup (backup-file file)]
@@ -70,19 +73,34 @@
       IDeref (deref [_] @state-atom)
       Closeable (close [_] (reset! state-atom ::closed)))))
 
+(defn- maybe-encrypted [output-stream cipher]
+  (if cipher (CipherOutputStream. output-stream cipher) output-stream))
+
+(defn- maybe-decrypted [input-stream cipher]
+  (if cipher (CipherInputStream. input-stream cipher) input-stream))
+
 (defn prevayler!
   ([handler]
    (prevayler! handler {}))
   ([handler initial-state]
    (prevayler! handler initial-state (File. "journal")))
   ([handler initial-state ^File file]
+   (prevayler! handler initial-state file nil nil))
+  ([handler initial-state ^File file ^Cipher enc-cipher ^Cipher dec-cipher]
    (let [state-atom (atom initial-state)
          backup (produce-backup! file)]
 
      (when backup
-       (restore! handler state-atom backup))
+       (with-open [data-in (-> backup
+                               (FileInputStream.)
+                               (maybe-decrypted dec-cipher)
+                               (DataInputStream.))]
+         (restore! handler state-atom data-in)))
 
-     (let [data-out (-> file FileOutputStream. DataOutputStream.)
+     (let [data-out (-> file
+                        (FileOutputStream.)
+                        (maybe-encrypted enc-cipher)
+                        (DataOutputStream.))
            write! (partial write-with-flush! data-out)]
 
        (write! @state-atom)
