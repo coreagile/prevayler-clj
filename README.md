@@ -1,4 +1,4 @@
-[![Clojars Project](http://clojars.org/prevayler-clj/latest-version.svg)](http://clojars.org/prevayler-clj)
+[![Clojars Project](https://img.shields.io/clojars/v/coreagile/prevayler-clj.svg)](https://clojars.org/coreagile/prevayler-clj)
 
 ## Features
 
