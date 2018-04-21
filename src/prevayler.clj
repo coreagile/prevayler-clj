@@ -65,9 +65,9 @@
 
 (defn- handle-event! [this handler state-atom write-fn event]
   (locking this
-    (let [state-with-result (handler @state-atom event)]
+    (let [[new-state :as state-with-result] (handler @state-atom event)]
       (write-fn event)
-      (reset! state-atom (first state-with-result))
+      (reset! state-atom new-state)
       state-with-result)))
 
 (defn transient-prevayler! [handler initial-state]
