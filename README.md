@@ -37,7 +37,7 @@ Prevayler-clj implements the [system prevalence pattern](http://en.wikipedia.org
 
 ## Files
 
-Prevayler's default file name is "journal" but you can pass in your own file. Prevayler-clj will create and write to it like this:
+Prevayler's default file name is `journal` but you can pass in your own file. Prevayler-clj will create and write to it like this:
 
 ### journal
 Contains the state at the moment your system was last started, followed by all events since. Serialization is done using [Nippy](https://github.com/ptaoussanis/nippy).
@@ -50,7 +50,11 @@ This new journal will only be consistent after the system state has been written
 After a new consistent journal is written, journal.backup is renamed with a timestamp appendix. You can keep these old versions elsewhere if you like. Prevayler no longer uses them.
 
 ## Transient Mode for Tests
-The transient-prevayler! function returns a transient prevayler the you can use for fast testing.
+The `transient-prevayler!` function returns a transient prevayler the you can use for fast testing.
+
+## Encryption At Rest
+If you give the `prevayler!` function an encryption and decryption cipher (`javax.crypto.Cipher`, both already initialized),
+then the journal files will be encrypted and decrypted with the given ciphers.
 
 ---
 
