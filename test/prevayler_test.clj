@@ -16,10 +16,13 @@
 
 (def initial-state "A")
 
-(defn- tmp-file []
-  (doto
-    (File/createTempFile "test-" ".tmp")
-    (.delete)))
+(defn- tmp-file
+  ([] (tmp-file "test"))
+  ([prefix]
+   (doto
+     (File/createTempFile (str prefix "-") ".tmp"
+                          (doto (File. "./.test-files") (.mkdir)))
+     (.delete))))
 
 (facts "About transient prevayler"
   (with-open [p (transient-prevayler! handler initial-state)]
@@ -92,7 +95,7 @@
     [enc-cipher dec-cipher]))
 
 (facts "About prevalence using encryption"
-  (let [file (tmp-file)
+  (let [file (tmp-file "enc-test")
         random (SecureRandom.)
         salt (byte-array 20)
         _ (.nextBytes random salt)
