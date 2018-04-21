@@ -21,7 +21,7 @@
   ([prefix]
    (doto
      (File/createTempFile (str prefix "-") ".tmp"
-                          (doto (File. "./.test-files") (.mkdir)))
+                          (doto (File. "./target/.test-files") (.mkdirs)))
      (.delete))))
 
 (facts "About transient prevayler"
