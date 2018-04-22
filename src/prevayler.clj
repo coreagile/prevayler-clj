@@ -85,6 +85,9 @@
 (defn- maybe-decrypted [input-stream input-wrapper]
   (if input-wrapper (input-wrapper input-stream) input-stream))
 
+(defn- try-to-close [thing]
+  (try (.close thing) (catch Throwable t (.printStackTrace t))))
+
 (defn prevayler!
   ([handler]
    (prevayler! handler {}))
@@ -117,9 +120,9 @@
            (handle-event! this handler state-atom write! event))
          Closeable
          (close [_]
-           (.close data-out)
-           (.close encrypted-out)
-           (.close file-out)
+           (try-to-close data-out)
+           (try-to-close encrypted-out)
+           (try-to-close file-out)
            (reset! state-atom ::closed))
          IDeref
          (deref [_]
