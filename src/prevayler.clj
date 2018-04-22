@@ -4,7 +4,7 @@
   (:import
     [java.io File FileOutputStream FileInputStream DataInputStream DataOutputStream EOFException Closeable IOException]
     [clojure.lang IDeref ExceptionInfo]
-    (javax.crypto Cipher CipherOutputStream CipherInputStream BadPaddingException)))
+    (javax.crypto BadPaddingException)))
 
 (def bad-journal (str "Unable to open backup. Either it was encrypted and you "
                       "attempted to open it without proper ciphers or "
