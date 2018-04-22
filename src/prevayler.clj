@@ -79,11 +79,11 @@
       IDeref (deref [_] @state-atom)
       Closeable (close [_] (reset! state-atom ::closed)))))
 
-(defn- maybe-encrypted [output-stream cipher]
-  (if cipher (CipherOutputStream. output-stream cipher) output-stream))
+(defn- maybe-encrypted [output-stream output-wrapper]
+  (if output-wrapper (output-wrapper output-stream) output-stream))
 
-(defn- maybe-decrypted [input-stream cipher]
-  (if cipher (CipherInputStream. input-stream cipher) input-stream))
+(defn- maybe-decrypted [input-stream input-wrapper]
+  (if input-wrapper (input-wrapper input-stream) input-stream))
 
 (defn prevayler!
   ([handler]
@@ -92,20 +92,20 @@
    (prevayler! handler initial-state (File. "journal")))
   ([handler initial-state ^File file]
    (prevayler! handler initial-state file nil nil))
-  ([handler initial-state ^File file ^Cipher enc-cipher ^Cipher dec-cipher]
+  ([handler initial-state ^File file enc-wrapper dec-wrapper]
    (let [state-atom (atom initial-state)
          backup (produce-backup! file)]
 
      (when backup
        (with-open [data-in (-> backup
                                (FileInputStream.)
-                               (maybe-decrypted dec-cipher)
+                               (maybe-decrypted dec-wrapper)
                                (DataInputStream.))]
          (restore! handler state-atom data-in)))
 
      (let [data-out (-> file
                         (FileOutputStream.)
-                        (maybe-encrypted enc-cipher)
+                        (maybe-encrypted enc-wrapper)
                         (DataOutputStream.))
            write! (partial write-with-flush! data-out)]
 

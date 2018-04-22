@@ -3,7 +3,7 @@
             [prevayler :refer :all])
   (:import [java.io File]
            (clojure.lang ExceptionInfo)
-           (javax.crypto Cipher SecretKeyFactory)
+           (javax.crypto Cipher SecretKeyFactory CipherOutputStream CipherInputStream)
            (javax.crypto.spec IvParameterSpec PBEKeySpec SecretKeySpec)
            (java.security SecureRandom)))
 
@@ -75,7 +75,7 @@
   (let [file (tmp-file)]
     (test-prevayler file #(prevayler! handler initial-state file))))
 
-(defn- make-ciphers [salt password]
+(defn- make-wrappers [salt password]
   (let [key-type "PBKDF2WithHmacSHA256"
         cipher-type "AES/CBC/PKCS5Padding"
         key (-> (SecretKeyFactory/getInstance key-type)
@@ -90,9 +90,9 @@
                    (.getParameters)
                    (.getParameterSpec IvParameterSpec))
         dec-cipher (doto
-                     (Cipher/getInstance cipher-type)
-                     (.init Cipher/DECRYPT_MODE key params))]
-    [enc-cipher dec-cipher]))
+                      (Cipher/getInstance cipher-type)
+                      (.init Cipher/DECRYPT_MODE key params))]
+    [#(CipherOutputStream. % enc-cipher) #(CipherInputStream. % dec-cipher)]))
 
 (facts "About prevalence using encryption"
   (let [file (tmp-file "enc-test")
@@ -100,9 +100,9 @@
         salt (byte-array 20)
         _ (.nextBytes random salt)
 
-        [enc-cipher dec-cipher] (make-ciphers salt "good!")
-        [bad-enc bad-dec] (make-ciphers salt "wrong!")
-        encprev! #(prevayler! handler initial-state file enc-cipher dec-cipher)
+        [enc dec] (make-wrappers salt "good!")
+        [bad-enc bad-dec] (make-wrappers salt "wrong!")
+        encprev! #(prevayler! handler initial-state file enc dec)
         badprev! #(prevayler! handler initial-state file bad-enc bad-dec)]
     (test-prevayler file encprev!)
 
