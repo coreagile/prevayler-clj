@@ -97,16 +97,14 @@
          backup (produce-backup! file)]
 
      (when backup
-       (with-open [data-in (-> backup
-                               (FileInputStream.)
-                               (maybe-decrypted dec-wrapper)
-                               (DataInputStream.))]
+       (with-open [file-in (FileInputStream. backup)
+                   decrypted-in (maybe-decrypted file-in dec-wrapper)
+                   data-in (DataInputStream. decrypted-in)]
          (restore! handler state-atom data-in)))
 
-     (let [data-out (-> file
-                        (FileOutputStream.)
-                        (maybe-encrypted enc-wrapper)
-                        (DataOutputStream.))
+     (let [file-out (FileOutputStream. file)
+           encrypted-out (maybe-encrypted file-out enc-wrapper)
+           data-out (DataOutputStream. encrypted-out)
            write! (partial write-with-flush! data-out)]
 
        (write! @state-atom)
@@ -120,6 +118,8 @@
          Closeable
          (close [_]
            (.close data-out)
+           (.close encrypted-out)
+           (.close file-out)
            (reset! state-atom ::closed))
          IDeref
          (deref [_]
