@@ -55,14 +55,20 @@ You can also tell Prevayler to store the journal and its backups in an S3
 bucket. You can use the `prevayler-s3/prevayler!` function instead. This
 function takes a handler and a map of parameters. They are as follows:
 
-```
-  {
+```clojure
+{
     :bucket "s3-bucket-name"
     :file "name-of-journal-file" ; (defaults to "journal")
     :initial-state some-value    ; (defaults to {})
     :debug? boolean              ; print debug output? (defaults to false)
-    :dbg-out (fn [msg] ...)      ; (defaults to fn that prints with date)
-  }
+    :dbg-out (fn [msg])      ; (defaults to fn that prints with date)
+}
+```
+
+For example:
+
+```clojure
+(s3/prevayler! handler :bucket "my-bucket")
 ```
 
 ## Transient Mode for Tests
