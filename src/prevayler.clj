@@ -1,10 +1,10 @@
 (ns prevayler
   (:require
-    [taoensso.nippy :as nippy])
+   [taoensso.nippy :as nippy])
   (:import
-    [java.io File FileOutputStream FileInputStream DataInputStream DataOutputStream EOFException Closeable IOException]
-    [clojure.lang IDeref ExceptionInfo]
-    (javax.crypto BadPaddingException)))
+   [java.io File FileOutputStream FileInputStream DataInputStream DataOutputStream EOFException Closeable IOException]
+   [clojure.lang IDeref ExceptionInfo]
+   (javax.crypto BadPaddingException)))
 
 (def bad-journal (str "Unable to open backup. Either it was encrypted and you "
                       "attempted to open it without proper ciphers or "
@@ -26,8 +26,11 @@
   [prevayler event]
   (first (handle! prevayler event)))
 
-(defn backup-file [file]
-  (File. (str file ".backup")))
+(defn ^String backup-name [file]
+  (str file ".backup"))
+
+(defn backup-file [^String file]
+  (File. (backup-name file)))
 
 (defn- try-to-restore! [handler state-atom data-in]
   (let [read-value! #(nippy/thaw-from-in! data-in)]
@@ -36,7 +39,7 @@
       (let [[new-state _result] (handler @state-atom (read-value!))]
         (reset! state-atom new-state)))))
 
-(defn- restore! [handler state-atom data-in]
+(defn restore! [handler state-atom data-in]
   (try
     (try-to-restore! handler state-atom data-in)
     (catch EOFException _done)
@@ -55,15 +58,18 @@
         (assert (.renameTo file backup))
         backup))))
 
+(defn ^String archive-name [file]
+  (str file "-" (System/currentTimeMillis)))
+
 (defn- archive! [^File file]
-  (let [new-file (File. (str file "-" (System/currentTimeMillis)))]
+  (let [new-file (File. (archive-name file))]
     (assert (.renameTo file new-file))))
 
-(defn- write-with-flush! [data-out value]
+(defn write-with-flush! [data-out value]
   (nippy/freeze-to-out! data-out value)
   (.flush data-out))
 
-(defn- handle-event! [this handler state-atom write-fn event]
+(defn handle-event! [this handler state-atom write-fn event]
   (locking this
     (let [[new-state :as state-with-result] (handler @state-atom event)]
       (write-fn event)
@@ -85,7 +91,7 @@
 (defn- maybe-decrypted [input-stream input-wrapper]
   (if input-wrapper (input-wrapper input-stream) input-stream))
 
-(defn- try-to-close [thing]
+(defn try-to-close [thing]
   (try (.close thing) (catch Throwable t (.printStackTrace t))))
 
 (defn prevayler!

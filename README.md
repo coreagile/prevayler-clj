@@ -49,6 +49,20 @@ This new journal will only be consistent after the system state has been written
 ### journal.backup-[timestamp]
 After a new consistent journal is written, journal.backup is renamed with a timestamp appendix. You can keep these old versions elsewhere if you like. Prevayler no longer uses them.
 
+## S3 Storage
+
+You can also tell Prevayler to store the journal and its backups in an S3
+bucket. You can use the `prevayler-s3/prevayler!` function instead. This
+function takes a handler and a map of parameters. They are as follows:
+
+```
+  {
+    :bucket "s3-bucket-name"
+    :file "name-of-journal-file" ; (defaults to "journal")
+    :initial-state some-value    ; (defaults to {})
+  }
+```
+
 ## Transient Mode for Tests
 The `transient-prevayler!` function returns a transient prevayler the you can use for fast testing.
 
