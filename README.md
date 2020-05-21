@@ -61,7 +61,7 @@ function takes a handler and a map of parameters. They are as follows:
     :file "name-of-journal-file" ; (defaults to "journal")
     :initial-state some-value    ; (defaults to {})
     :debug? boolean              ; print debug output? (defaults to false)
-    :dbg-out (fn [msg])      ; (defaults to fn that prints with date)
+    :dbg-out (fn [msg])          ; (defaults to fn that prints with date)
 }
 ```
 
