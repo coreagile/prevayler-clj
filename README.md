@@ -49,7 +49,7 @@ This new journal will only be consistent after the system state has been written
 ### journal.backup-[timestamp]
 After a new consistent journal is written, journal.backup is renamed with a timestamp appendix. You can keep these old versions elsewhere if you like. Prevayler no longer uses them.
 
-## S3 Storage
+## S3 Storage [EXPERIMENTAL]
 
 You can also tell Prevayler to store the journal and its backups in an S3
 bucket. You can use the `prevayler-s3/prevayler!` function instead. This
@@ -70,6 +70,16 @@ For example:
 ```clojure
 (s3/prevayler! handler :bucket "my-bucket")
 ```
+
+Important notes -- S3 synchronization happens in a background thread, which 
+could run up to 5 seconds behind. It is possible that, if your application shuts
+down unexpectedly right after a persistence change, you will lose data.
+
+We're thinking about alternatives to this. Current thoughts:
+    * Text-based transaction log that gets uploaded? Won't work so well for 
+      machines (like EC2 instances) that have no persistent disk.
+    * A mode where we block writes inline? This is very slow (100-800 ms
+      per transaction).
 
 ## Transient Mode for Tests
 The `transient-prevayler!` function returns a transient prevayler the you can use for fast testing.
