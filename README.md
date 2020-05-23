@@ -73,7 +73,14 @@ For example:
 (s3/prevayler! handler :bucket "my-bucket")
 ```
 
-Important notes -- S3 synchronization happens in a background thread, which 
+Before trying to use S3 prevayler, you'll need to add an extra dependency
+to your project:
+
+``` 
+[software.amazon.awssdk/s3 "2.1.0"]
+```
+
+Important note -- S3 synchronization happens in a background thread, which 
 could run up to 1 second behind. It is possible that, if your application shuts
 down unexpectedly right after a persistence change, you will lose data.
 
