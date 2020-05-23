@@ -62,6 +62,8 @@ function takes a handler and a map of parameters. They are as follows:
     :initial-state some-value    ; (defaults to {})
     :debug? boolean              ; print debug output? (defaults to false)
     :dbg-out (fn [msg])          ; (defaults to fn that prints with date)
+    :sleep-time some-int         ; time to sleep between S3 uploads 
+                                 ; (in ms; defaults to 1000; minimum 0)
 }
 ```
 
@@ -72,8 +74,11 @@ For example:
 ```
 
 Important notes -- S3 synchronization happens in a background thread, which 
-could run up to 5 seconds behind. It is possible that, if your application shuts
+could run up to 1 second behind. It is possible that, if your application shuts
 down unexpectedly right after a persistence change, you will lose data.
+
+This can be tuned using the `:sleep-time` parameter, allowing you to trade off
+CPU usage for upload latency.
 
 We're thinking about alternatives to this. Current thoughts:
     * Text-based transaction log that gets uploaded? Won't work so well for 

@@ -5,6 +5,10 @@
    (java.io ByteArrayOutputStream Closeable DataInputStream DataOutputStream)
    (java.net URLEncoder)
    (java.nio.charset StandardCharsets)
+   (java.time.format DateTimeFormatter)
+   (java.time LocalDateTime)
+   (java.util.concurrent.locks ReentrantLock)
+   (java.util.concurrent TimeUnit)
    (software.amazon.awssdk.core.sync RequestBody ResponseTransformer)
    (software.amazon.awssdk.http.apache ApacheHttpClient)
    (software.amazon.awssdk.services.s3 S3Client)
@@ -14,10 +18,13 @@
     GetObjectRequest
     ListObjectsRequest
     PutObjectRequest
-    S3Object)
-   (java.util.concurrent.locks ReentrantLock)
-   (java.util Date)
-   (java.util.concurrent TimeUnit)))
+    S3Object)))
+
+(def ^:private date-formatter
+  (DateTimeFormatter/ofPattern "uuuu-MM-dd'T'HH:mm:ss.SSS"))
+
+(defn now-str []
+  (.format date-formatter (LocalDateTime/now)))
 
 (defn- key-exists? [^S3Client s3 bucket key]
   (let [r (-> (ListObjectsRequest/builder)
@@ -52,10 +59,12 @@
       (do
         (dbg (format "Using backup found at '%s'" backup))
         backup)
-      (when (key-exists? s3 bucket key)
-        (dbg (format "Renaming '%s' to '%s'" key backup))
-        (assert (rename-key! s3 bucket key backup))
-        backup))))
+      (if (key-exists? s3 bucket key)
+        (do
+          (dbg (format "Renaming '%s' to '%s'" key backup))
+          (assert (rename-key! s3 bucket key backup))
+          backup)
+        (dbg (format "'%s' not found" key))))))
 
 (defn- s3-client []
   (-> (S3Client/builder)
@@ -78,7 +87,8 @@
      (finally
        (.unlock ~access-lock))))
 
-(defn- keep-uploading! [^ReentrantLock byte-access-lock
+(defn- keep-uploading! [sleep-time
+                        ^ReentrantLock byte-access-lock
                         active?
                         needs-upload?
                         s3
@@ -88,6 +98,8 @@
                         die!
                         dbg]
   (let [tries (atom 0)
+        total-writes (atom 0)
+        dbg (fn [msg] (dbg #(format "[%d] %s" @total-writes msg)))
         max-tries 5]
     (dbg "Uploader started")
     (while @active?
@@ -120,8 +132,9 @@
               (when (or (>= @tries max-tries)
                         (-> t ex-data :die-immediately?))
                 (println "Giving up. Tries:" @tries)
-                (die!))))))
-      (Thread/sleep 1000))
+                (die!)))
+            (finally (swap! total-writes inc)))))
+      (Thread/sleep sleep-time))
     (dbg "Uploader exiting")))
 
 (defn- trigger-upload! [^ReentrantLock byte-access-lock
@@ -142,12 +155,13 @@
     (assert (rename-key! s3 bucket key new-key))))
 
 (defn prevayler! [handler &
-                  {:keys [bucket key initial-state debug? dbg-out]
+                  {:keys [bucket key initial-state debug? dbg-out sleep-time]
                    :or {key "journal"
                         initial-state {}
+                        sleep-time 1000
 
                         dbg-out
-                        (fn [msg] (println (format "[%s] %s" (Date.) msg)))}}]
+                        (fn [msg] (println (format "[%s] %s" (now-str) msg)))}}]
   (when-not bucket
     (throw (ex-info ":bucket not specified" {})))
 
@@ -157,7 +171,8 @@
         needs-upload? (atom false)
         session-bytes (atom (ByteArrayOutputStream.))
         data-out (atom (DataOutputStream. @session-bytes))
-        dbg (if debug? dbg-out identity)
+        dbg (if debug? (fn [o] (dbg-out (if (fn? o) (o) o)))
+                       identity)
         backup (produce-backup! dbg s3 bucket key)
         s3-flush-active? (atom true)
         die! (fn []
@@ -167,7 +182,8 @@
                  (reset! data-out nil)
                  (reset! session-bytes nil)
                  (reset! state-atom ::closed)))
-        s3-upload-future (future (keep-uploading! byte-access-lock
+        s3-upload-future (future (keep-uploading! sleep-time
+                                                  byte-access-lock
                                                   s3-flush-active?
                                                   needs-upload?
                                                   s3
@@ -218,13 +234,17 @@
 
  (def bucket (System/getenv "PREVAYLER_BUCKET"))
 
- (def p (prevayler! handler :bucket bucket :initial-state "" :debug? true))
+ (def p (prevayler! handler
+                    :bucket bucket
+                    :initial-state ""
+                    :debug? true
+                    :sleep-time 0))
 
  (def futures (->> (range 100)
                    (map
                     (fn [n]
                       (future
-                       (Thread/sleep (+ 1000 (rand-int 5000)))
+                       (Thread/sleep (+ 1000 (* 10 n)))
                        (p/handle! p (str "\n" (java.util.Date.) " -- " n))
                        "success")))
                    doall))
