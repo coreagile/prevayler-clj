@@ -49,56 +49,56 @@ This new journal will only be consistent after the system state has been written
 ### journal.backup-[timestamp]
 After a new consistent journal is written, journal.backup is renamed with a timestamp appendix. You can keep these old versions elsewhere if you like. Prevayler no longer uses them.
 
-## S3 Storage [EXPERIMENTAL]
-
-You can also tell Prevayler to store the journal and its backups in an S3
-bucket. You can use the `prevayler-s3/prevayler!` function instead. This
-function takes a handler and a map of parameters. They are as follows:
-
-```clojure
-{
-    :bucket "s3-bucket-name"
-    :file "name-of-journal-file" ; (defaults to "journal")
-    :initial-state some-value    ; (defaults to {})
-    :debug? boolean              ; print debug output? (defaults to false)
-    :dbg-out (fn [msg])          ; (defaults to fn that prints with date)
-    :sleep-time some-int         ; time to sleep between S3 uploads 
-                                 ; (in ms; defaults to 1000; minimum 0)
-}
-```
-
-For example:
-
-```clojure
-(s3/prevayler! handler :bucket "my-bucket")
-```
-
-Before trying to use S3 prevayler, you'll need to add an extra dependency
-to your project:
-
-``` 
-[software.amazon.awssdk/s3 "2.1.0"]
-```
-
-Important note -- S3 synchronization happens in a background thread, which 
-could run up to 1 second behind. It is possible that, if your application shuts
-down unexpectedly right after a persistence change, you will lose data.
-
-This can be tuned using the `:sleep-time` parameter, allowing you to trade off
-CPU usage for upload latency.
-
-We're thinking about alternatives to this. Current thoughts:
-    * Text-based transaction log that gets uploaded? Won't work so well for 
-      machines (like EC2 instances) that have no persistent disk.
-    * A mode where we block writes inline? This is very slow (100-800 ms
-      per transaction).
-
 ## Transient Mode for Tests
 The `transient-prevayler!` function returns a transient prevayler the you can use for fast testing.
 
-## Encryption At Rest
-If you give the `prevayler!` function an encryption and decryption cipher (`javax.crypto.Cipher`, both already initialized),
-then the journal files will be encrypted and decrypted with the given ciphers.
+## Input/Output interception
+
+You can accomplish encryption-at-rest by calling the 5-parameter form of
+`prevayler!`. The last two parameters are functions which take a stream and
+and a `java.util.concurrent.locks.ReentrantLock` and
+return a stream. The second-to-last function will be invoked with an
+`OutputStream` and must return an `OutputStream`, the last function will be
+invoked with an `InputStream` and return an `InputStream`. This way you can
+use `CipherOutputStream` and `CipherInputStream` to perform encryption-at-rest
+of the journal file.
+
+You can probably also do all kinds of other interesting things using an approach
+like `org.apache.commons.io.output.TeeOutputStream`. An example of this can
+be found in `prevayler.s3/backup-wrapper`, which wraps a stream, sending its
+contents to a `ByteArrayOutputStream` which, periodically, is flushed to an
+S3 bucket.
+
+The reason this works without weird partial writes is due to the `ReentrantLock`
+mentioned above. Whenever we attempt to read or write, we acquire the lock.
+That way, if the backup thread needs to get access to data, it can guarantee
+it gets a complete set by acquiring the lock.
+
+If you want to make all this work, you'll need to add extra dependencies
+to your project:
+                                               
+``` 
+[software.amazon.awssdk/s3 "2.1.0"]
+[commons-io/commons-io "2.7"]
+```
+
+S3 backup happens in a background thread, which could run up to 1 second behind.
+
+You can see an example of all this working together at the bottom of the 
+`prevayler` namespace. 
+
+*Important Note* CipherOutputStream operates quite differently from normal
+streams. If you don't close the stream cleanly, it will be completely unusable.
+This is because it needs to add padding to the end of the output on close.
+
+So, if your application crashes prematurely and you haven't closed the stream
+cleanly, you will be out of luck. The journal will be unusable. One thing
+you can do to mitigate this problem is to close the prevayler periodically.
+This will cause the streams to be padded properly. It will also have the 
+added side effect of generating a lot of journal backup files.
+
+Another thing you can do is not rely on CipherOutputStream at all. Use 
+disk-based encryption for local disk, and bucket encryption for your S3 backups.
 
 ---
 
