@@ -3,6 +3,7 @@
    [prevayler.locks :refer :all]
    [taoensso.nippy :as nippy])
   (:import
+   [clojure.lang IDeref ExceptionInfo]
    [java.io
     File
     FileOutputStream
@@ -10,21 +11,14 @@
     DataInputStream
     DataOutputStream
     EOFException
-    Closeable
-    IOException]
-   [clojure.lang IDeref ExceptionInfo]
-   [javax.crypto BadPaddingException
-                 KeyGenerator
+    Closeable]
+   [javax.crypto KeyGenerator
                  Cipher
                  CipherInputStream
                  CipherOutputStream]
    [java.security Key]))
 
-(def bad-journal (str "Unable to open backup. Either it was encrypted and you "
-                      "attempted to open it without proper ciphers or "
-                      "we were interrupted during write"))
-
-(def bad-cipher "Incorrect cipher provided for journal")
+(def bad-journal "Warning - Corruption at end of prevalence file")
 
 (defprotocol Prevayler
   (handle! [_ event]
@@ -59,10 +53,6 @@
   (try
     (try-to-restore! handler state-atom data-in)
     (catch EOFException _done)
-    (catch IOException e
-      (if (= BadPaddingException (-> e (.getCause) (.getClass)))
-        (throw (ex-info bad-cipher {} e))
-        (throw e)))
     (catch ExceptionInfo e
       (throw (ex-info bad-journal {} e)))))
 
@@ -173,11 +163,12 @@
 
  (def fname "journal")
 
+ (require 'prevayler.s3)
+
  ;; Application-managed encryption-at-rest and backups
 
  (def encryption-key (aes-key))
 
- (require 'prevayler.s3)
  (def p
    (prevayler! handler
                ""

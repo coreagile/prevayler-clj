@@ -81,6 +81,10 @@
 
 (defn- realize-msg [o] (if (fn? o) (o) o))
 
+(defn- archive! [s3 bucket key]
+  (let [new-key (p/archive-name key)]
+    (assert (rename-key! s3 bucket key new-key))))
+
 (defn- keep-uploading! [sleep-time
                         active?
                         needs-upload?
@@ -90,10 +94,12 @@
                         backup-contents
                         die!
                         dbg]
-  (let [tries (atom 0)
+  (let [backup (produce-backup! dbg s3 bucket key)
+        tries (atom 0)
         total-writes (atom 0)
         dbg (fn [msg] (dbg #(format "[%d] %s" @total-writes (realize-msg msg))))
         max-tries 5]
+    (when backup (archive! s3 bucket backup))
     (dbg "Uploader started")
     (while @active?
       (when @needs-upload?
@@ -126,10 +132,6 @@
       (Thread/sleep sleep-time))
     (dbg "Uploader exiting")))
 
-(defn- archive! [s3 bucket key]
-  (let [new-key (p/archive-name key)]
-    (assert (rename-key! s3 bucket key new-key))))
-
 (defn backup-wrapper
   [bucket &
    {:keys [key debug? dbg-out sleep-time]
@@ -144,7 +146,6 @@
                       (fn [msg] (println (format "[%s] %s" (now-str) msg))))
           dbg (if debug? (fn [o] (dbg-out (realize-msg o)))
                          identity)
-          backup (produce-backup! dbg s3 bucket key)
           s3-flush-active? (atom true)
           needs-upload? (atom false)
           backup-contents (ByteArrayOutputStream.)
@@ -175,9 +176,11 @@
               (proxy-super resetByteCount))
             (close []
               (proxy-super close)
+
+             ;; In case we are wrapping a stream that writes extra bytes during
+             ;; close -- thresholdReached isn't called during stream closing
               (cause-upload!)
               (die!)))]
-      (when backup (archive! s3 bucket backup))
       (future (keep-uploading! sleep-time
                                s3-flush-active?
                                needs-upload?
