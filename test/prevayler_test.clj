@@ -2,7 +2,7 @@
   (:require [midje.sweet :refer :all]
             [prevayler :refer :all]
             [prevayler :as p])
-  (:import [java.io File]
+  (:import [java.io File IOException]
            (clojure.lang ExceptionInfo)
            (javax.crypto Cipher SecretKeyFactory CipherOutputStream CipherInputStream)
            (javax.crypto.spec IvParameterSpec PBEKeySpec SecretKeySpec)
@@ -97,7 +97,7 @@
         @p) => "ABCDE")
     (fact "Won't destroy the journal if it fails to read"
       (with-open [p (badprev!)]
-        @p) => (throws ExceptionInfo bad-cipher)
+        @p) => (throws IOException)
       (with-open [p (prevayler! handler initial-state file)]
         @p) => (throws ExceptionInfo bad-journal)
       (with-open [p (encprev!)]

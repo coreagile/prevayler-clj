@@ -72,15 +72,15 @@
     (assert (.renameTo file new-file))))
 
 (defn write-with-flush! [data-out value]
-  (with-global-access-lock
-    (nippy/freeze-to-out! data-out value)
-    (.flush data-out)))
+  (nippy/freeze-to-out! data-out value)
+  (.flush data-out))
 
 (defn handle-event! [handler state-atom write-fn event]
-  (let [[new-state :as state-with-result] (handler @state-atom event)]
-    (write-fn event)
-    (reset! state-atom new-state)
-    state-with-result))
+  (with-global-access-lock
+    (let [[new-state :as state-with-result] (handler @state-atom event)]
+      (write-fn event)
+      (reset! state-atom new-state)
+      state-with-result)))
 
 (defn transient-prevayler! [handler initial-state]
   (let [state-atom (atom initial-state)
