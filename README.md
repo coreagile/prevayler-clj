@@ -56,7 +56,6 @@ The `transient-prevayler!` function returns a transient prevayler the you can us
 
 You can accomplish encryption-at-rest by calling the 5-parameter form of
 `prevayler!`. The last two parameters are functions which take a stream and
-and a `java.util.concurrent.locks.ReentrantLock` and
 return a stream. The second-to-last function will be invoked with an
 `OutputStream` and must return an `OutputStream`, the last function will be
 invoked with an `InputStream` and return an `InputStream`. This way you can
