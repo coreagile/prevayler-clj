@@ -91,10 +91,10 @@
       IDeref (deref [_] @state-atom)
       Closeable (close [_] (reset! state-atom ::closed)))))
 
-(defn- maybe-encrypted [output-stream output-wrapper]
+(defn- maybe-output-wrapped [output-stream output-wrapper]
   (if output-wrapper (output-wrapper output-stream) output-stream))
 
-(defn- maybe-decrypted [input-stream input-wrapper]
+(defn- maybe-input-wrapped [input-stream input-wrapper]
   (if input-wrapper (input-wrapper input-stream) input-stream))
 
 (defn try-to-close [thing]
@@ -115,12 +115,12 @@
 
      (when backup
        (with-open [file-in (FileInputStream. backup)
-                   wrapped-in (maybe-decrypted file-in in-wrapper)
+                   wrapped-in (maybe-input-wrapped file-in in-wrapper)
                    data-in (DataInputStream. wrapped-in)]
          (restore! handler state-atom data-in)))
 
      (let [file-out (FileOutputStream. file)
-           wrapped-out (maybe-encrypted file-out out-wrapper)
+           wrapped-out (maybe-output-wrapped file-out out-wrapper)
            data-out (DataOutputStream. wrapped-out)
            write! (partial write-with-flush! data-out)]
 
