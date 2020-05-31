@@ -1,13 +1,11 @@
 (ns prevayler.s3
   (:require [prevayler :as p]
-            [prevayler.locks :refer :all]
-            [clojure.java.io :as io])
+            [prevayler.locks :refer :all])
   (:import
    (java.net URLEncoder)
    (java.nio.charset StandardCharsets)
    (java.time.format DateTimeFormatter)
    (java.time LocalDateTime)
-   (java.util.concurrent.locks ReentrantLock)
    (software.amazon.awssdk.core.sync RequestBody ResponseTransformer)
    (software.amazon.awssdk.http.apache ApacheHttpClient)
    (software.amazon.awssdk.services.s3 S3Client)
@@ -18,7 +16,7 @@
     ListObjectsRequest
     PutObjectRequest
     S3Object)
-   (java.io ByteArrayOutputStream FileOutputStream FileInputStream)
+   (java.io ByteArrayOutputStream)
    (org.apache.commons.io.output ThresholdingOutputStream TeeOutputStream)))
 
 (def ^:private date-formatter
@@ -166,7 +164,10 @@
                        (reset! s3-flush-active? false)))
                    (dbg "Already terminated")))
 
-          cause-upload! (partial reset! needs-upload? true)
+          cause-upload!
+          (fn []
+            (when-not @needs-upload? (dbg "Triggering upload"))
+            (reset! needs-upload? true))
 
           threshholding-stream
           (proxy [ThresholdingOutputStream] [1]
@@ -180,16 +181,18 @@
              ;; In case we are wrapping a stream that writes extra bytes during
              ;; close -- thresholdReached isn't called during stream closing
               (cause-upload!)
-              (die!)))]
-      (future (keep-uploading! sleep-time
-                               s3-flush-active?
-                               needs-upload?
-                               s3
-                               bucket
-                               key
-                               backup-contents
-                               die!
-                               dbg))
+              (die!)))
+
+          publish-thread (doto (Thread. (fn [] (keep-uploading! sleep-time
+                                                                s3-flush-active?
+                                                                needs-upload?
+                                                                s3
+                                                                bucket
+                                                                key
+                                                                backup-contents
+                                                                die!
+                                                                dbg))))]
+      (.start publish-thread)
       (TeeOutputStream. out-stream threshholding-stream))))
 
 (comment
