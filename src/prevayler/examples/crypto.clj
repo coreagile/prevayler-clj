@@ -1,5 +1,8 @@
 (ns prevayler.examples.crypto
-  (:import (javax.crypto KeyGenerator Cipher CipherInputStream CipherOutputStream)
+  (:import (javax.crypto Cipher
+                         CipherInputStream
+                         CipherOutputStream
+                         KeyGenerator)
            (java.security Key)))
 
 (def encrypt-mode Cipher/ENCRYPT_MODE)

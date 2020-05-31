@@ -5,24 +5,20 @@
   (:import
    [clojure.lang IDeref ExceptionInfo]
    [java.io
-    File
-    FileOutputStream
-    FileInputStream
+    Closeable
     DataInputStream
     DataOutputStream
     EOFException
-    Closeable]
-   [javax.crypto KeyGenerator
-                 Cipher
-                 CipherInputStream
-                 CipherOutputStream]
-   [java.security Key]))
+    File
+    FileOutputStream
+    FileInputStream]))
 
 (def bad-journal "Warning - Corruption at end of prevalence file")
 
 (defprotocol Prevayler
   (handle! [_ event]
-    "Handle event and return vector containing the new state and event result."))
+    (str "Handle event and return vector containing the new state "
+         "and event result.")))
 
 (defn eval!
   "Handle event and return event result."
@@ -169,8 +165,8 @@
             (System/getenv "PREVAYLER_BUCKET")
             :key fname
             :debug? true))
-          ((crypto/aes-cipher-wrapper Cipher/ENCRYPT_MODE encryption-key))))
-    (crypto/aes-cipher-wrapper Cipher/DECRYPT_MODE encryption-key)))
+          ((crypto/aes-cipher-wrapper crypto/encrypt-mode encryption-key))))
+    (crypto/aes-cipher-wrapper cipher/decrypt-mode encryption-key)))
 
  ;; This should break
  (def other-key (crypto/aes-key))
