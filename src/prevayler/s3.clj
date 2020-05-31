@@ -79,7 +79,7 @@
                   .build)]
     (.getObject s3 get-r (ResponseTransformer/toInputStream))))
 
-(defn- realize-msg [o] (if (fn? o) (o) o))
+(defn realize-msg [o] (if (fn? o) (o) o))
 
 (defn- archive! [s3 bucket key]
   (let [new-key (p/archive-name key)]
