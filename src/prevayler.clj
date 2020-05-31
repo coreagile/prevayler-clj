@@ -141,18 +141,6 @@
          IDeref
          (deref [_] @state-atom))))))
 
-(defn aes-key []
-  (.generateKey (doto (KeyGenerator/getInstance "AES")
-                  (.init 256))))
-
-(defn aes-cipher-wrapper [^Integer mode, ^Key encryption-key]
-  (let [cipher (doto (Cipher/getInstance "AES/ECB/PKCS5Padding")
-                 (.init mode encryption-key))]
-    (fn [s]
-      (if (= mode Cipher/DECRYPT_MODE)
-        (CipherInputStream. s cipher)
-        (CipherOutputStream. s cipher)))))
-
 (comment
  (defn- handler [state event]
    (when (= "boom" event) (throw (RuntimeException.)))
@@ -163,32 +151,34 @@
 
  (def fname "journal")
 
- (require 'prevayler.s3)
+ (require '[prevayler.examples.s3 :as s3])
+ (require '[prevayler.examples.crypto :as crypto])
 
  ;; Application-managed encryption-at-rest and backups
 
- (def encryption-key (aes-key))
+ (def encryption-key (crypto/aes-key))
 
  (def p
-   (prevayler! handler
-               ""
-               (File. fname)
-               (fn [s]
-                 (-> s
-                     ((prevayler.s3/backup-wrapper
-                       (System/getenv "PREVAYLER_BUCKET")
-                       :key fname
-                       :debug? true))
-                     ((aes-cipher-wrapper Cipher/ENCRYPT_MODE encryption-key))))
-               (aes-cipher-wrapper Cipher/DECRYPT_MODE encryption-key)))
+   (prevayler!
+    handler
+    ""
+    (File. fname)
+    (fn [s]
+      (-> s
+          ((s3/backup-wrapper
+            (System/getenv "PREVAYLER_BUCKET")
+            :key fname
+            :debug? true))
+          ((crypto/aes-cipher-wrapper Cipher/ENCRYPT_MODE encryption-key))))
+    (crypto/aes-cipher-wrapper Cipher/DECRYPT_MODE encryption-key)))
 
  ;; This should break
- (def other-key (aes-key))
+ (def other-key (crypto/aes-key))
  (prevayler! handler
              ""
              (File. fname)
-             (aes-cipher-wrapper Cipher/ENCRYPT_MODE other-key)
-             (aes-cipher-wrapper Cipher/DECRYPT_MODE other-key))
+             (crypto/aes-cipher-wrapper crypto/encrypt-mode other-key)
+             (crypto/aes-cipher-wrapper cipher/decrypt-mode other-key))
 
  ;; Without encryption, with backups
 
@@ -196,7 +186,7 @@
    (prevayler! handler
                ""
                (File. fname)
-               (prevayler.s3/backup-wrapper
+               (s3/backup-wrapper
                 (System/getenv "PREVAYLER_BUCKET")
                 :key fname
                 :debug? true)))

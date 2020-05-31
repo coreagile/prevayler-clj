@@ -1,4 +1,4 @@
-(ns prevayler.s3
+(ns prevayler.examples.s3
   (:require [prevayler :as p]
             [prevayler.locks :refer :all])
   (:import

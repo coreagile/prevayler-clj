@@ -1,12 +1,10 @@
 (ns prevayler-test
   (:require [midje.sweet :refer :all]
-            [prevayler :refer :all]
-            [prevayler :as p])
+            [prevayler :refer :all :as p]
+            [prevayler.examples.crypto :as crypto])
   (:import [java.io File IOException]
            (clojure.lang ExceptionInfo)
-           (javax.crypto Cipher SecretKeyFactory CipherOutputStream CipherInputStream)
-           (javax.crypto.spec IvParameterSpec PBEKeySpec SecretKeySpec)
-           (java.security SecureRandom)))
+           (javax.crypto Cipher)))
 
 ; (do (require 'midje.repl) (midje.repl/autotest))
 
@@ -77,9 +75,9 @@
     (test-prevayler file #(prevayler! handler initial-state file))))
 
 (defn- crypto-wrappers []
-  (let [key (p/aes-key)]
-    [(p/aes-cipher-wrapper Cipher/ENCRYPT_MODE key)
-     (p/aes-cipher-wrapper Cipher/DECRYPT_MODE key)]))
+  (let [key (crypto/aes-key)]
+    [(crypto/aes-cipher-wrapper crypto/encrypt-mode key)
+     (crypto/aes-cipher-wrapper crypto/decrypt-mode key)]))
 
 (facts "About prevalence using encryption"
   (let [file (tmp-file "enc-test")
