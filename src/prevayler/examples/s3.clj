@@ -91,6 +91,7 @@
                         key
                         backup-contents
                         die!
+                        err-out
                         dbg]
   (let [backup (produce-backup! dbg s3 bucket key)
         tries (atom 0)
@@ -119,29 +120,33 @@
               (dbg (fn [] (format "Uploaded bytes: %d" (count bytes))))
               (reset! tries 0))
             (catch Throwable t
-              (println "FAILED to complete S3 upload")
-              (.printStackTrace t)
+              (err-out "FAILED to complete S3 upload" t)
               (if (not @upload-success?) (reset! needs-upload? true))
               (when (or (>= @tries max-tries)
                         (-> t ex-data :die-immediately?))
-                (println "Giving up. Tries:" @tries)
+                (err-out "Giving up. Tries:" @tries)
                 (die!)))
             (finally (swap! total-writes inc)))))
       (Thread/sleep sleep-time))
     (dbg "Uploader exiting")))
 
+(defn time-msg [msg] (format "[%s] %s" (now-str) msg))
+
 (defn backup-wrapper
   [bucket &
-   {:keys [key debug? dbg-out sleep-time]
+   {:keys [key debug? err-out dbg-out sleep-time]
     :or {key "journal"
          sleep-time 1000
 
+         err-out
+         (fn [msg & [throwable]]
+           (.println (System/err) (time-msg msg))
+           (when throwable (.printStackTrace throwable)))
+
          dbg-out
-         (fn [msg] (println (format "[%s] %s" (now-str) msg)))}}]
+         (fn [msg] (-> msg time-msg println))}}]
   (fn [out-stream]
     (let [s3 (s3-client)
-          dbg-out (or dbg-out
-                      (fn [msg] (println (format "[%s] %s" (now-str) msg))))
           dbg (if debug? (fn [o] (dbg-out (realize-msg o)))
                          identity)
           s3-flush-active? (atom true)
@@ -157,7 +162,7 @@
 
                      (if @needs-upload?
                        (binding [*out* *err*]
-                         (println "WARNING: S3 sync never finished")))
+                         (err-out "WARNING: S3 sync never finished")))
 
                      (with-global-access-lock
                        (dbg "Termination requested")
@@ -183,16 +188,22 @@
               (cause-upload!)
               (die!)))
 
-          publish-thread (doto (Thread. (fn [] (keep-uploading! sleep-time
-                                                                s3-flush-active?
-                                                                needs-upload?
-                                                                s3
-                                                                bucket
-                                                                key
-                                                                backup-contents
-                                                                die!
-                                                                dbg))))]
+          publish-thread (Thread. (fn []
+                                    (try
+                                      (keep-uploading! sleep-time
+                                                       s3-flush-active?
+                                                       needs-upload?
+                                                       s3
+                                                       bucket
+                                                       key
+                                                       backup-contents
+                                                       die!
+                                                       err-out
+                                                       dbg)
+                                      (catch Throwable t
+                                        (err-out "Failed to run publish thread" t)))))]
       (.start publish-thread)
+      (dbg "Started publish thread")
       (TeeOutputStream. out-stream threshholding-stream))))
 
 (comment

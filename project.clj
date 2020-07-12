@@ -1,4 +1,4 @@
-(defproject coreagile/prevayler-clj "3.0.13-SNAPSHOT"
+(defproject coreagile/prevayler-clj "3.0.13"
   :description "Simple, fast, ACID persistence in Clojure."
   :url "https://github.com/klauswuestefeld/prevayler-clj"
   :license {:name "BSD"
