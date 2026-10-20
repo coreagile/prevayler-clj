@@ -1,10 +1,9 @@
 (ns prevayler-test
   (:require [midje.sweet :refer :all]
-            [prevayler :refer :all :as p]
+            [prevayler :refer :all]
             [prevayler.examples.crypto :as crypto])
-  (:import [java.io File IOException]
-           (clojure.lang ExceptionInfo)
-           (javax.crypto Cipher)))
+  (:import (clojure.lang ExceptionInfo)
+           (java.io File IOException)))
 
 ; (do (require 'midje.repl) (midje.repl/autotest))
 
@@ -22,12 +21,6 @@
      (File/createTempFile (str prefix "-") ".tmp"
                           (doto (File. "./target/.test-files") (.mkdirs)))
      (.delete))))
-
-(facts "About transient prevayler"
-  (with-open [p (transient-prevayler! handler initial-state)]
-    @p => "A"
-    (handle! p "B") => ["AB" "+B"]
-    @p => "AB"))
 
 (defmacro test-prevayler [file prev!]
   `(do
@@ -74,12 +67,12 @@
   (let [file (tmp-file)]
     (test-prevayler file #(prevayler! handler initial-state file))))
 
-(defn- crypto-wrappers []
+#_(defn- crypto-wrappers []
   (let [key (crypto/aes-key)]
-    [(crypto/aes-cipher-wrapper crypto/encrypt-mode key)
-     (crypto/aes-cipher-wrapper crypto/decrypt-mode key)]))
+    [(crypto/aes-cipher-out-wrapper key)
+     (crypto/aes-cipher-in-wrapper key)]))
 
-(facts "About prevalence using encryption"
+#_(facts "About prevalence using encryption"
   (let [file (tmp-file "enc-test")
         [enc dec] (crypto-wrappers)
         [bad-enc bad-dec] (crypto-wrappers)

@@ -1,4 +1,5 @@
 (ns prevayler.examples.crypto
+  (:require [prevayler :as p])
   (:import (javax.crypto Cipher
                          CipherInputStream
                          CipherOutputStream
@@ -12,10 +13,18 @@
 (defn aes-key []
   (.generateKey (KeyGenerator/getInstance "AES")))
 
-(defn aes-cipher-wrapper [^Integer mode, ^Key encryption-key]
-  (let [cipher (doto (Cipher/getInstance "AES/ECB/PKCS5Padding")
-                 (.init mode encryption-key))]
-    (fn [s]
-      (if (= mode Cipher/DECRYPT_MODE)
-        (CipherInputStream. s cipher)
-        (CipherOutputStream. s cipher)))))
+(defn- get-cipher [^Integer mode, ^Key encryption-key]
+  (doto (Cipher/getInstance "AES/ECB/PKCS5Padding")
+    (.init mode encryption-key)))
+
+(defn aes-cipher-in-wrapper [^Key encryption-key]
+  (let [cipher (get-cipher decrypt-mode encryption-key)]
+    (reify p/InWrapper
+      (wrap-in [_ in]
+        (CipherInputStream. in cipher)))))
+
+(defn aes-cipher-out-wrapper [^Key encryption-key]
+  (let [cipher (get-cipher encrypt-mode encryption-key)]
+    (reify p/OutWrapper
+      (wrap-out [_ in]
+        (CipherOutputStream. in cipher)))))

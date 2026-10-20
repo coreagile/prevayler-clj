@@ -49,9 +49,6 @@ This new journal will only be consistent after the system state has been written
 ### journal.backup-[timestamp]
 After a new consistent journal is written, journal.backup is renamed with a timestamp appendix. You can keep these old versions elsewhere if you like. Prevayler no longer uses them.
 
-## Transient Mode for Tests
-The `transient-prevayler!` function returns a transient prevayler the you can use for fast testing.
-
 ## Input/Output interception
 
 You can accomplish encryption-at-rest by calling the 5-parameter form of

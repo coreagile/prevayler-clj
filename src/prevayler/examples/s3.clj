@@ -2,22 +2,22 @@
   (:require [prevayler :as p]
             [prevayler.locks :refer :all])
   (:import
-   (java.net URLEncoder)
-   (java.nio.charset StandardCharsets)
-   (java.time.format DateTimeFormatter)
-   (java.time LocalDateTime)
-   (software.amazon.awssdk.core.sync RequestBody ResponseTransformer)
-   (software.amazon.awssdk.http.apache ApacheHttpClient)
-   (software.amazon.awssdk.services.s3 S3Client)
-   (software.amazon.awssdk.services.s3.model
-    CopyObjectRequest
-    DeleteObjectRequest
-    GetObjectRequest
-    ListObjectsRequest
-    PutObjectRequest
-    S3Object)
-   (java.io ByteArrayOutputStream)
-   (org.apache.commons.io.output ThresholdingOutputStream TeeOutputStream)))
+    (java.net URLEncoder)
+    (java.nio.charset StandardCharsets)
+    (java.time.format DateTimeFormatter)
+    (java.time LocalDateTime)
+    (software.amazon.awssdk.core.sync RequestBody ResponseTransformer)
+    (software.amazon.awssdk.http.apache ApacheHttpClient)
+    (software.amazon.awssdk.services.s3 S3Client)
+    (software.amazon.awssdk.services.s3.model
+      CopyObjectRequest
+      DeleteObjectRequest
+      GetObjectRequest
+      ListObjectsRequest
+      PutObjectRequest
+      S3Object)
+    (java.io ByteArrayOutputStream)
+    (org.apache.commons.io.output ThresholdingOutputStream TeeOutputStream)))
 
 (def ^:private date-formatter
   (DateTimeFormatter/ofPattern "uuuu-MM-dd'T'HH:mm:ss.SSS"))
@@ -183,38 +183,40 @@
             (close []
               (proxy-super close)
 
-             ;; In case we are wrapping a stream that writes extra bytes during
-             ;; close -- thresholdReached isn't called during stream closing
+              ;; In case we are wrapping a stream that writes extra bytes during
+              ;; close -- thresholdReached isn't called during stream closing
               (cause-upload!)
               (die!)))
 
-          publish-thread (Thread. (fn []
-                                    (try
-                                      (keep-uploading! sleep-time
-                                                       s3-flush-active?
-                                                       needs-upload?
-                                                       s3
-                                                       bucket
-                                                       key
-                                                       backup-contents
-                                                       die!
-                                                       err-out
-                                                       dbg)
-                                      (catch Throwable t
-                                        (err-out "Failed to run publish thread" t)))))]
+          publish-thread
+          (Thread.
+            (fn []
+              (try
+                (keep-uploading! sleep-time
+                                 s3-flush-active?
+                                 needs-upload?
+                                 s3
+                                 bucket
+                                 key
+                                 backup-contents
+                                 die!
+                                 err-out
+                                 dbg)
+                (catch Throwable t
+                  (err-out "Failed to run publish thread" t)))))]
       (.start publish-thread)
       (dbg "Started publish thread")
       (TeeOutputStream. out-stream threshholding-stream))))
 
 (comment
- (with-open [fout (java.io.FileOutputStream. "test.txt")
-             wrapped-out ((backup-wrapper (System/getenv "PREVAYLER_BUCKET")
-                                          :debug? true
-                                          :key "test") fout)
-             writer (java.io.OutputStreamWriter. wrapped-out)
-             print-writer (java.io.PrintWriter. writer)]
-   (dorun (map (fn [n] (.println print-writer (format "hello %d" n)))
-               (range 100))))
+  (with-open [fout (java.io.FileOutputStream. "test.txt")
+              wrapped-out ((backup-wrapper (System/getenv "PREVAYLER_BUCKET")
+                                           :debug? true
+                                           :key "test") fout)
+              writer (java.io.OutputStreamWriter. wrapped-out)
+              print-writer (java.io.PrintWriter. writer)]
+    (dorun (map (fn [n] (.println print-writer (format "hello %d" n)))
+                (range 100))))
 
- *e
- )
+  *e
+  )
