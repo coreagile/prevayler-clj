@@ -135,7 +135,7 @@
       event))
 
   Closeable
-  (close [_] (.close prevayler-state))
+  (close [_] (try-to-close prevayler-state))
 
   IDeref
   (deref [_] (deref (:state-atom prevayler-state))))

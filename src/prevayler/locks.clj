@@ -5,13 +5,14 @@
 (def global-access-lock (delay (ReentrantLock.)))
 
 (defn -with-global-access-lock [f]
-  (try
-    (if (or (.tryLock @global-access-lock)
-            (.tryLock @global-access-lock 5 TimeUnit/SECONDS))
-      (f)
-      (throw (ex-info "Failed to acquire access lock" {})))
-    (finally
-      (.unlock @global-access-lock))))
+  (let [^ReentrantLock lock @global-access-lock]
+    (try
+      (if (or (.tryLock lock)
+              (.tryLock lock 5 TimeUnit/SECONDS))
+        (f)
+        (throw (ex-info "Failed to acquire access lock" {})))
+      (finally
+        (.unlock lock)))))
 
 (defmacro with-global-access-lock [& body]
   `(-with-global-access-lock (fn [] ~@body)))
